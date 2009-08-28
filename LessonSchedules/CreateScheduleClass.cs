@@ -38,7 +38,7 @@ namespace LessonSchedules {
         }
 
         private Brush BrushFromType( DateType type ) {
-            switch( type ) {
+            switch ( type ) {
                 case DateType.holiday:
                     return Brushes.Red;
                 case DateType.normal:
@@ -62,11 +62,23 @@ namespace LessonSchedules {
             fontFamily = Georgia;
         }
 
+        private Decimal RoundUpToNearestMultiple( Decimal toRound, Decimal multipleOf ) {
+            //assume multipleOf is a nonnegative integer
+            if ( multipleOf == 0 ) {
+                return 0;
+            } else {
+                return Math.Round( ( toRound + multipleOf - 1 ) / multipleOf ) * multipleOf;
+            }
+        }
+
         public FixedDocument CreateSchedule(
             string StudentName, string SchoolYear,
             DateTime pFirstLesson, DateTime LastLesson, int TotalWeeks,
             IEnumerable<Holiday> pHolidays, IEnumerable<Recital> Recitals,
-            string PaymentExplanation, Decimal PaymentRate, bool RoundPayments ) {
+            Decimal PaymentRate, Decimal RoundPayments,
+            int UserPaymentCount, string FirstStudentName, Decimal FirstStudentRate,
+            string SecondStudentName, Decimal SecondStudentRate, string LessonTime,
+            Decimal UserMonthlyPayment ) {
 
             Holidays = pHolidays;
             FirstLesson = pFirstLesson;
@@ -88,7 +100,8 @@ namespace LessonSchedules {
             string HeaderText = "Jaewon Lee Piano Studio\n" +
                                 "Lesson Schedule\n" +
                                 "Student: " + StudentName + "\n" +
-                                "Year: " + SchoolYear + "\n";
+                                "Year: " + SchoolYear + "\n" +
+                                LessonTime + "\n";
 
             //columns of lesson dates
             DateTime currLesson = FirstLesson;
@@ -97,17 +110,20 @@ namespace LessonSchedules {
 
             int halfwayPoint = ( TotalWeeks % 2 == 0 ) ? TotalWeeks / 2 : TotalWeeks / 2 + 1;
 
+            //if the userpaymentcount was not specified, make it unlimited. There are only 12 months in the year
+            UserPaymentCount = UserPaymentCount < 1 ? 13 : UserPaymentCount;
+
             Dictionary<string, DateType> LessonDatesColumn1
-                = CreateLessonDatesColumn( ref currLesson, ref paymentCount, ref holidayCount,
+                = CreateLessonDatesColumn( ref currLesson, ref paymentCount, UserPaymentCount, ref holidayCount,
                                            1, halfwayPoint );
             Dictionary<string, DateType> LessonDatesColumn2
-                = CreateLessonDatesColumn( ref currLesson, ref paymentCount, ref holidayCount,
+                = CreateLessonDatesColumn( ref currLesson, ref paymentCount, UserPaymentCount, ref holidayCount,
                                            halfwayPoint + 1, TotalWeeks );
 
             //recital dates
             string RecitalDatesLabel = "Recital Dates:";
             StringBuilder RecitalDatesText = new StringBuilder();
-            foreach( Recital r in Recitals )
+            foreach ( Recital r in Recitals )
                 RecitalDatesText.AppendFormat( "{0:" + recitalDateFormat + "}: {1}\n", r.Day, r.Name );
 
             //payments
@@ -115,35 +131,48 @@ namespace LessonSchedules {
             Decimal totalPayment = totalLessons * PaymentRate;
             Decimal paymentPerPeriod = totalPayment / paymentCount;
             Decimal finalPayment;
-            if( RoundPayments ) {
-                paymentPerPeriod = Math.Round( paymentPerPeriod );
+            if ( UserMonthlyPayment != 0 ) {
+                paymentPerPeriod = UserMonthlyPayment;
+                finalPayment = totalPayment - paymentPerPeriod * paymentCount + paymentPerPeriod;
+            } else if ( RoundPayments > 0 ) {
+                paymentPerPeriod = RoundUpToNearestMultiple( paymentPerPeriod, RoundPayments );
                 finalPayment = totalPayment - paymentPerPeriod * paymentCount + paymentPerPeriod;
             } else {
                 finalPayment = paymentPerPeriod;
             }
 
-            string PaymentExplanationText = "Total Lessons: " + totalLessons.ToString() + "\n" +
-                                            "Payment Rate: " + PaymentExplanation + "\n" +
+            string PaymentExplanationText;
+            if ( FirstStudentName == string.Empty ) {
+                PaymentExplanationText = "Total Lessons: " + totalLessons.ToString() + "\n" +
+                                            "Payment Rate: $" + PaymentRate.ToString( "N02" ) + "\n" +
                                             "Payment Explanation: " + totalLessons.ToString() +
                                                 " × $" + PaymentRate.ToString( "N02" ) +
                                                 " = $" + totalPayment.ToString( "N02" ) + "\n";
+            } else {
+                PaymentExplanationText = FirstStudentName + ": " + totalLessons.ToString() +
+                                            " lessons at $" + FirstStudentRate.ToString( "N02" ) +
+                                            " = $" + ( FirstStudentRate * totalLessons ).ToString( "N02" ) + "\n" +
+                                            SecondStudentName + ": " + totalLessons.ToString() +
+                                            " lessons at $" + SecondStudentRate.ToString( "N02" ) +
+                                            " = $" + ( SecondStudentRate * totalLessons ).ToString( "N02" ) + "\n";
+            }
 
             Dictionary<string, DateType> LessonDatesColumn1Subbed = new Dictionary<string, DateType>();
             Dictionary<string, DateType> LessonDatesColumn2Subbed = new Dictionary<string, DateType>();
-            foreach( KeyValuePair<string, DateType> line in LessonDatesColumn1 )
+            foreach ( KeyValuePair<string, DateType> line in LessonDatesColumn1 )
                 LessonDatesColumn1Subbed.Add( string.Format( line.Key, paymentPerPeriod.ToString( "N02" ) ),
                     line.Value );
 
             int finalPaymentIndex = -1;
-            for( int i = 0; i < LessonDatesColumn2.Count; i++ ) {
-                if( LessonDatesColumn2.ElementAt( i ).Value == DateType.payment )
+            for ( int i = 0; i < LessonDatesColumn2.Count; i++ ) {
+                if ( LessonDatesColumn2.ElementAt( i ).Value == DateType.payment )
                     finalPaymentIndex = i;
             }
-            if( finalPaymentIndex == -1 ) throw new ApplicationException( "what the..." );
+            if ( finalPaymentIndex == -1 ) throw new ApplicationException( "what the..." );
 
-            for( int i = 0; i < LessonDatesColumn2.Count; i++ ) {
+            for ( int i = 0; i < LessonDatesColumn2.Count; i++ ) {
                 KeyValuePair<string, DateType> line = LessonDatesColumn2.ElementAt( i );
-                if( i == finalPaymentIndex )
+                if ( i == finalPaymentIndex )
                     LessonDatesColumn2Subbed.Add( string.Format( line.Key, finalPayment.ToString( "N02" ) ),
                         line.Value );
                 else
@@ -169,16 +198,17 @@ namespace LessonSchedules {
                                     yPos,
                                     leftMargin + columnWidth + columnGutter ).Height;
             yPos += col1Height > col2Height ? col1Height : col2Height;
-            yPos += padding;
+            //yPos += padding;
 
-            itemSize = AddTextBlock( RecitalDatesLabel, yPos, contentWidth, leftMargin, recitalBrush );
-            yPos += AddTextBlock(
-                RecitalDatesText.ToString(),
-                yPos,
-                contentWidth,
-                leftMargin + itemSize.Width + tabSpacing,
-                recitalBrush
-            ).Height;
+            //TODO don't show recital label if there is no recitals
+            //itemSize = AddTextBlock( RecitalDatesLabel, yPos, contentWidth, leftMargin, recitalBrush );
+            //yPos += AddTextBlock(
+            //    RecitalDatesText.ToString(),
+            //    yPos,
+            //    contentWidth,
+            //    leftMargin + itemSize.Width + tabSpacing,
+            //    recitalBrush
+            //).Height;
 
             yPos += padding;
             itemSize = AddTextBlock( PaymentExplanationText, yPos );
@@ -186,9 +216,9 @@ namespace LessonSchedules {
             return fd;
         }
 
-        private Dictionary<string, DateType> CreateLessonDatesColumn( ref DateTime currLesson, ref int payments, ref int holidayCount, int initial, int final ) {
+        private Dictionary<string, DateType> CreateLessonDatesColumn( ref DateTime currLesson, ref int payments, int UserPaymentCount, ref int holidayCount, int initial, int final ) {
             Dictionary<string, DateType> column = new Dictionary<string, DateType>();
-            for( int i = initial; i <= final; i++ ) {
+            for ( int i = initial; i <= final; i++ ) {
                 string initialString
                     = string.Format(
                         "Lesson {0:D}: {1:" + lessonDateFormat + "}",
@@ -197,7 +227,7 @@ namespace LessonSchedules {
 
                 Holiday holiday = IsHoliday( currLesson );
 
-                if( holiday != null ) {
+                if ( holiday != null ) {
                     column.Add(
                         string.Format(
                             "{0}: {1:" + lessonDateFormat + "}",
@@ -205,7 +235,7 @@ namespace LessonSchedules {
                             currLesson ),
                         DateType.holiday );
                     holidayCount++;
-                } else if( IsPayment( currLesson ) ) {
+                } else if ( IsPayment( currLesson ) && payments < UserPaymentCount ) {
                     column.Add( initialString + " Payment: ${0}", DateType.payment );
                     payments++;
                 } else {
@@ -218,25 +248,25 @@ namespace LessonSchedules {
         }
 
         private Holiday IsHoliday( DateTime toCheck ) {
-            foreach( Holiday h in Holidays )
-                if( h.Contains( toCheck ) )
+            foreach ( Holiday h in Holidays )
+                if ( h.Contains( toCheck ) )
                     return h;
             return null;
         }
 
         private bool IsPayment( DateTime toCheck ) {
-            if( IsHoliday( toCheck ) != null )
+            if ( IsHoliday( toCheck ) != null )
                 return false;
-            if( toCheck == FirstLesson )
+            if ( toCheck == FirstLesson )
                 return true;
 
             DateTime prevLesson = toCheck;
             //TimeSpan week = new TimeSpan( 7, 0, 0, 0 );
             do {
                 prevLesson -= week;
-            } while( IsHoliday( prevLesson ) != null );
+            } while ( IsHoliday( prevLesson ) != null );
 
-            if( toCheck.Month != prevLesson.Month &&
+            if ( toCheck.Month != prevLesson.Month &&
                 !IsPayment( prevLesson ) )
                 return true;
             else
@@ -246,7 +276,7 @@ namespace LessonSchedules {
         private Size AddDatesColumn( Dictionary<string, DateType> Column, double Top, double Left ) {
             double yPos = Top;
             double width = 0;
-            foreach( KeyValuePair<string, DateType> line in Column ) {
+            foreach ( KeyValuePair<string, DateType> line in Column ) {
                 Size size = AddTextBlock(
                                 line.Key,
                                 yPos,
@@ -254,7 +284,7 @@ namespace LessonSchedules {
                                 Left,
                                 BrushFromType( line.Value ) );
                 yPos += size.Height;
-                if( size.Width > width )
+                if ( size.Width > width )
                     width = size.Width;
             }
 
@@ -288,7 +318,7 @@ namespace LessonSchedules {
 
             double height = ft.Height;
 
-            if( Top + height > 11 * 96 )
+            if ( Top + height > 11 * 96 )
                 return new Size( 0, 0 );
 
             //add the text to the page
@@ -300,7 +330,7 @@ namespace LessonSchedules {
             tb.Width = Width;
             tb.TextWrapping = TextWrapping.Wrap;
             tb.Foreground = Color;
-            if( Centered )
+            if ( Centered )
                 tb.TextAlignment = TextAlignment.Center;
             Canvas.SetTop( tb, Top );
             Canvas.SetLeft( tb, Left );

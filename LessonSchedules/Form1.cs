@@ -63,9 +63,15 @@ namespace LessonSchedules {
                     nTotalLessons,
                     CurrentHolidayList.Items.Cast<Holiday>(),
                     CurrentRecitalList.Items.Cast<Recital>(),
-                    PaymentExplanation.Text,
                     PaymentRate.Value,
-                    Round.Checked
+                    RoundAmount.Value,
+                    (int )UserPaymentCount.Value,
+                    FirstStudentName.Text,
+                    FirstStudentRate.Value,
+                    SecondStudentName.Text,
+                    SecondStudentRate.Value,
+                    LessonTime.Text,
+                    UserMonthlyPayment.Value
                 );
         }
 
