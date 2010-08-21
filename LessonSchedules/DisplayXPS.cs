@@ -11,17 +11,21 @@ using System.Windows.Documents;
 namespace LessonSchedules {
     public partial class DisplayXPS : Form {
         private FixedDocument _fd;
+        private bool _print;
 
-        public DisplayXPS( FixedDocument fd ) {
+        public DisplayXPS( FixedDocument fd, bool print ) {
             _fd = fd;
             InitializeComponent();
+            _print = print;
         }
 
         private void LoadFile( object sender, EventArgs e ) {
-            //XPSViewer.Url = new Uri( _fileName );
             System.Windows.Controls.DocumentViewer dv = new System.Windows.Controls.DocumentViewer();
             dv.Document = _fd;
             elementHost1.Child = dv;
+
+            if (_print)
+                dv.Print();
         }        
     }
 }

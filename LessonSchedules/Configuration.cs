@@ -5,10 +5,12 @@ using System.Text;
 using System.IO;
 using System.Xml.Linq;
 using System.Xml;
+using System.Globalization;
 
 namespace LessonSchedules {
     class LSConfiguration {
-        const string configFileName = "LessonSchedules.config";
+        string configFileName = "LessonSchedules.config";
+        const string dateFormat = "dd/MM/yyyy";
 
         XDocument theDoc;
 
@@ -17,16 +19,56 @@ namespace LessonSchedules {
                 theDoc = new XDocument(
                     new XElement( "settings",
                         new XElement( "holidays" ),
-                        new XElement( "recitals" )
+                        new XElement( "glDates" ),
+                        new XElement( "general" )
                     )
                 );
                 Save();
             } else {
                 theDoc = XDocument.Load( configFileName );
             }
+
+            configFileName = Path.GetFullPath(configFileName);
         }
 
+        #region general
+
+        public string GetGeneralSetting(string name)
+        {
+            XElement found = theDoc.Root.Element("general").Element(name);
+            if (found == null)
+                return null;
+            else
+                return found.Value;
+        }
+
+        public void SetGeneralSetting(string name, string value)
+        {
+            XElement found = theDoc.Root.Element("general").Element(name);
+            if (found == null)
+            {
+                found = new XElement(name, value);
+                theDoc.Root.Element("general").Add(found);
+            }
+            else
+            {
+                found.Value = value;
+            }
+
+            Save();
+        }
+
+        #endregion
+
         #region holidays
+
+        private IEnumerable<XElement> HolidayElementFromName(string name)
+        {
+            return from holidayEl in theDoc.Root.Element("holidays").Elements("holiday")
+                   where holidayEl.Attribute("name").Value == name
+                   select holidayEl;
+        }
+
         /// <summary>
         /// Returns whether the name conflicts
         /// </summary>
@@ -72,23 +114,7 @@ namespace LessonSchedules {
             HolidayElementFromName( name ).Remove();
         }
 
-        IEnumerable<XElement> HolidayElementFromName( string name ) {
-            return from holidayEl in theDoc.Root.Element( "holidays" ).Elements( "holiday" )
-                   where holidayEl.Attribute( "name" ).Value == name
-                   select holidayEl;
-        }
-
-        //public List<string> HolidayList {
-        //    get {
-        //        List<string> theList = new List<string>();
-        //        foreach( XElement holidayEl in theDoc.Root.Element( "holidays" ).Elements( "holiday" ) )
-        //            theList.Add( holidayEl.Attribute( "name" ).Value );
-
-        //        return theList;
-        //    }
-        //}
-
-        public List<Holiday> HolidayList {
+        public IList<Holiday> HolidayList {
             get {
                 List<Holiday> theList = new List<Holiday>();
                 foreach( XElement holidayEl in theDoc.Root.Element( "holidays" ).Elements( "holiday" ) )
@@ -100,52 +126,63 @@ namespace LessonSchedules {
 
         #endregion holidays
 
-        #region recitals
+        #region group lesson
 
-        /// <summary>
-        /// Returns whether already exists or not
-        /// </summary>
-        public bool AddRecital( Recital r ) {
-            if( RecitalElementFromDate( r.Day ) != null ) {
+        private IEnumerable<XElement> GLElementFromDate(DateTime date)
+        {
+            return from glEl in theDoc.Root.Element("glDates").Elements("glDate")
+                   where DateTime.ParseExact(glEl.Attribute("date").Value,
+                                    dateFormat, CultureInfo.CurrentCulture)
+                                == date
+                   select glEl;
+        }
+
+        private XElement GlDateToXml(DateTime gl)
+        {
+            return
+                new XElement("glDate",
+                    new XAttribute("date", gl.ToString(dateFormat)));
+        }
+
+        private DateTime GlDateFromXml(XElement el)
+        {
+            return DateTime.ParseExact(el.Attribute("date").Value, dateFormat, CultureInfo.CurrentCulture);
+        }
+
+        public bool AddGLDate(DateTime gl)
+        {
+            if (GLElementFromDate(gl).Count() > 0)
                 return false;
-            } else {
-                theDoc.Root.Element( "recitals" ).Add( r.ToXml() );
-                this.Save();
-                return true;
+
+            theDoc.Root.Element("glDates").Add(GlDateToXml(gl));
+            this.Save();
+
+            return true;
+        }
+
+        public void DeleteGLDate(DateTime gl)
+        {
+            GLElementFromDate(gl).Remove();
+        }
+
+        public void DeleteAllGLDates()
+        {
+            theDoc.Root.Element("glDates").Elements("glDate").Remove();
+        }
+
+        public IList<DateTime> GLDateList
+        {
+            get
+            {
+                SortedSet<DateTime> theList = new SortedSet<DateTime>();
+                foreach (XElement glEl in theDoc.Root.Element("glDates").Elements())
+                    theList.Add(GlDateFromXml(glEl));
+
+                return theList.ToList();
             }
         }
 
-        public void DeleteRecital( DateTime date ) {
-            XElement recitalEl = RecitalElementFromDate( date );
-            if( recitalEl != null )
-                recitalEl.Remove();
-        }
-
-        /// <summary>
-        /// Returns null if not found
-        /// </summary>
-        XElement RecitalElementFromDate( DateTime date ) {
-            foreach( XElement recitalEl in theDoc.Root.Element( "recitals" ).Elements( "recital" ) ) {
-                Recital r = new Recital( recitalEl );
-                if( r.Day.Day == date.Day &&
-                    r.Day.Month == date.Month &&
-                    r.Day.Year == date.Year )
-                    return recitalEl;
-            }
-
-            return null;
-        }
-
-        public List<Recital> RecitalList {
-            get {
-                List<Recital> theList = new List<Recital>();
-                foreach( XElement recitalEl in theDoc.Root.Element( "recitals" ).Elements( "recital" ) )
-                    theList.Add( new Recital( recitalEl ) );
-                return theList;
-            }
-        }
-
-        #endregion recitals
+        #endregion
 
         void Save() {
             theDoc.Save( configFileName );
@@ -185,34 +222,6 @@ namespace LessonSchedules {
 
         public override string ToString() {
             return Name;
-        }
-    }
-
-    class Recital {
-        const XmlDateTimeSerializationMode serializationMode = XmlDateTimeSerializationMode.Local;
-        const string format = "dddd MM/dd/yy";
-        public DateTime Day;
-        public string Name;
-
-        public Recital( DateTime pDay, string pName ) {
-            Day = pDay;
-            Name = pName;
-        }
-
-        public Recital( XElement recitalEl ) {
-            Day = XmlConvert.ToDateTime( recitalEl.Value, serializationMode );
-            Name = recitalEl.Attribute( "name" ).Value;
-        }
-
-        public XElement ToXml() {
-            return new XElement( "recital",
-                new XAttribute( "name", Name ),
-                XmlConvert.ToString( Day, serializationMode )
-            );
-        }
-
-        public override string ToString() {
-            return Day.ToString( format ) + ": " + Name;
         }
     }
 }
