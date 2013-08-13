@@ -21,6 +21,8 @@ namespace LessonSchedules
         const string recitalDateFormat = "dddd, MMM d yyyy";
         const string lessonDateFormat = "MMM d";
 
+        const string numberFormat = "N0";
+
         FontFamily fontFamily;
         const int fontSize = 16;
         const int topMargin = 72;
@@ -175,7 +177,7 @@ namespace LessonSchedules
             Dictionary<string, DateType> LessonDatesColumn1Subbed = new Dictionary<string, DateType>();
             Dictionary<string, DateType> LessonDatesColumn2Subbed = new Dictionary<string, DateType>();
             foreach (KeyValuePair<string, DateType> line in LessonDatesColumn1)
-                LessonDatesColumn1Subbed.Add(string.Format(line.Key, paymentPerPeriod.ToString("N02")),
+                LessonDatesColumn1Subbed.Add(string.Format(line.Key, paymentPerPeriod.ToString(numberFormat)),
                     line.Value);
 
             int finalPaymentIndex = -1;
@@ -196,10 +198,10 @@ namespace LessonSchedules
             {
                 KeyValuePair<string, DateType> line = LessonDatesColumn2.ElementAt(i);
                 if (i == finalPaymentIndex)
-                    LessonDatesColumn2Subbed.Add(string.Format(line.Key, finalPayment.ToString("N02")),
+                    LessonDatesColumn2Subbed.Add(string.Format(line.Key, finalPayment.ToString(numberFormat)),
                         line.Value);
                 else
-                    LessonDatesColumn2Subbed.Add(string.Format(line.Key, paymentPerPeriod.ToString("N02")),
+                    LessonDatesColumn2Subbed.Add(string.Format(line.Key, paymentPerPeriod.ToString(numberFormat)),
                         line.Value);
             }
 
@@ -286,23 +288,24 @@ namespace LessonSchedules
             int groupLessons, Decimal groupLessonsRate)
         {
             return "Private Lessons: " + privateLessons.ToString() + "\n" +
-                   "Private Lessons Rate: $" + privateLessonsRate.ToString("N02") + "\n" +
+                   "Private Lessons Rate: $" + privateLessonsRate.ToString(numberFormat) + "\n" +
                    (groupLessons > 0
                        ?
                        "Group Lessons: " + groupLessons.ToString() + "\n" +
-                       "Group Lessons Rate: $" + groupLessonsRate.ToString("N02") + "\n"
+                       "Group Lessons Rate: $" + groupLessonsRate.ToString(numberFormat) + "\n"
                        :
-                       "") +
-                    "Total: " + QbyR(privateLessons, privateLessonsRate)
+                       "")
+                    /* + "Total: " + QbyR(privateLessons, privateLessonsRate)
                     + (groupLessons > 0
                           ? " + " + QbyR(groupLessons, groupLessonsRate)
                           : "")
-                    + " = $" + (privateLessons * privateLessonsRate + groupLessons * groupLessonsRate).ToString("N02") + "\n";
+                    + " = $" + (privateLessons * privateLessonsRate + groupLessons * groupLessonsRate).ToString(numberFormat) */
+                        + "\n";
         }
 
         private string QbyR(int q, Decimal r)
         {
-            return q.ToString() + " × $" + r.ToString("N02");
+            return q.ToString() + " × $" + r.ToString(numberFormat);
         }
 
         private Dictionary<string, DateType> CreateLessonDatesColumn(ref DateTime currLesson, ref int payments, int UserPaymentCount, ref int holidayCount, int initial, int final)
