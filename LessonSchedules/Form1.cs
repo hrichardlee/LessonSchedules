@@ -46,6 +46,8 @@ namespace LessonSchedules {
             Decimal tempDec;
             if (Decimal.TryParse(config.GetGeneralSetting("groupLessonRate"), out tempDec))
                 groupLessonRate.Value = tempDec;
+            if (Decimal.TryParse(config.GetGeneralSetting("extraFees"), out tempDec))
+                extraFees.Value = tempDec;
             if (Decimal.TryParse(config.GetGeneralSetting("roundAmount"), out tempDec))
                 RoundAmount.Value = tempDec;
             string tempStr;
@@ -135,6 +137,7 @@ namespace LessonSchedules {
                     FirstStudentGL.Checked,
                     SecondStudentGL.Checked,
                     ExtraTextBox.Text,
+                    extraFees.Value,
                     LastMonthSmall.Checked
                 );
         }
@@ -252,6 +255,11 @@ namespace LessonSchedules {
             }
 
             return true;
+        }
+
+        private void extraFees_ValueChanged(object sender, EventArgs e)
+        {
+            config.SetGeneralSetting("extraFees", extraFees.Value.ToString());
         }
 
         #endregion general

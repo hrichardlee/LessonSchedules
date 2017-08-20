@@ -93,7 +93,7 @@ namespace LessonSchedules
             Decimal UserMonthlyPayment,
             IList<DateTime> GroupLessonDates, Decimal GroupLessonRate, string GroupLessonNamePlural, string GroupLessonNameSingular,
             bool FirstStudentGLs, bool SecondStudentGLs,
-            string ExtraText, bool smallLastMonth)
+            string ExtraText, Decimal ExtraFees, bool smallLastMonth)
         {
             Holidays = pHolidays;
             FirstLesson = pFirstLesson;
@@ -153,7 +153,8 @@ namespace LessonSchedules
             int totalLessons = TotalWeeks - holidayCount;
             Decimal totalPayment =
                 totalLessons * PaymentRate
-                + totalGLs * GroupLessonRate * numberOfStudentsDoingGL;
+                + totalGLs * GroupLessonRate * numberOfStudentsDoingGL
+                + ExtraFees;
             Decimal paymentPerPeriod = totalPayment / paymentCount;
             Decimal finalPayment = CalculateFinalPayment(smallLastMonth, PaymentRate, LessonDatesColumn2, paymentCount, totalPayment,
                 UserMonthlyPayment, RoundPayments, ref paymentPerPeriod);
