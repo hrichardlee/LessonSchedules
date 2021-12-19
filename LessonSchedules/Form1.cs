@@ -51,6 +51,10 @@ namespace LessonSchedules {
             if (Decimal.TryParse(config.GetGeneralSetting("roundAmount"), out tempDec))
                 RoundAmount.Value = tempDec;
             string tempStr;
+            tempStr = config.GetGeneralSetting("extraText");
+            if (tempStr != null)
+                // not totally sure why this replace is needed
+                extraText.Text = tempStr.Replace("\n", "\r\n");
             tempStr = config.GetGeneralSetting("groupLessonNameSingular");
             if (tempStr != null)
                 groupLessonsNameSingular.Text = tempStr;
@@ -136,7 +140,7 @@ namespace LessonSchedules {
                     groupLessonsNameSingular.Text,
                     FirstStudentGL.Checked,
                     SecondStudentGL.Checked,
-                    ExtraTextBox.Text,
+                    extraText.Text,
                     extraFees.Value,
                     LastMonthSmall.Checked
                 );
@@ -257,6 +261,11 @@ namespace LessonSchedules {
             return true;
         }
 
+        private void extraText_TextChanged(object sender, EventArgs e)
+        {
+            config.SetGeneralSetting("extraText", extraText.Text);
+        }
+
         private void extraFees_ValueChanged(object sender, EventArgs e)
         {
             config.SetGeneralSetting("extraFees", extraFees.Value.ToString());
@@ -335,7 +344,17 @@ namespace LessonSchedules {
 
             AddEditHoliday.Enabled = false;
             LoadHolidayList();
-            if( isEdit ) CurrentHolidayList.Items.Clear();
+            if (isEdit) {
+                // If we edited a holiday that was in CurrentHolidayList, we need to update it so that we don't have an
+                // out-of-date holiday being referenced. To make the code simple, we just clear the entire list of
+                // current holidays and add all of the current holidays back. O(n^2) warning!
+                var currentHolidayNames = CurrentHolidayList.Items.Cast<Holiday>().Select(h => h.Name).ToList();
+                CurrentHolidayList.Items.Clear();
+                foreach (var holiday in HolidayList.Items.Cast<Holiday>()) {
+                    if (currentHolidayNames.Contains(holiday.Name))
+                        CurrentHolidayList.Items.Add(holiday);
+                }
+            }
         }
 
         private void HolidaySelected( object sender, EventArgs e ) {
@@ -530,6 +549,5 @@ namespace LessonSchedules {
             MessageBox.Show("Generic error. Try again.");
         }
         #endregion
-
     }
 }
